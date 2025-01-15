@@ -1,151 +1,183 @@
-# SQLAlchemy Deep Dive
+# Day 2: FastAPI and SQLAlchemy Deep Dive
 
-## 1. Engine Creation and Configuration
-```python
-from sqlalchemy import create_engine
-engine = create_engine("sqlite:///todooo.db")
-```
-- `create_engine`: Creates database engine instance
-- `"sqlite:///todooo.db"`: URL format for SQLite
-  - `sqlite:///` indicates SQLite database
-  - `todooo.db` is the database file name
-  - For other databases, URLs would be like: `postgresql://user:password@localhost/dbname`
+## Overview
+Today focused on building RESTful APIs using FastAPI and integrating SQLAlchemy for database operations. The main project was creating a Todo API application with full CRUD functionality.
 
-## 2. Declarative Base
+## Key Learning Points
+- FastAPI route handlers and status codes
+- SQLAlchemy ORM basics and database operations
+- Database session management
+- API error handling
+- Pydantic models for request validation
+
+## Project 1: Basic Database Setup with SQLAlchemy
+
+### Code Implementation
 ```python
+from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
-Base = declarative_base()
-```
-- `declarative_base()`: Creates base class for all ORM models
-- All model classes inherit from this `Base`
-- Manages metadata about tables, columns, and relationships
-- Provides mapping between Python classes and database tables
 
-## 3. Model Definition
-```python
+# Create SQLite engine instance
+engine = create_engine("sqlite:///todooo.db")
+
+# Create declarative base meta instance
+Base = declarative_base()
+
 class ToDo(Base):
-    __tablename__ = 'todos'  # Note: Should use __tablename__ not tablename
-    
+    __tablename__ = 'todos'
     id = Column(Integer, primary_key=True)
     task = Column(String(256))
 ```
-### Column Types and Parameters:
-- `Integer`: Whole number values
-- `String(256)`: Variable-length string with max 256 characters
-- Common Parameters:
-  - `primary_key=True`: Marks column as primary key
-  - `nullable=False`: Column cannot contain NULL
-  - `unique=True`: Values must be unique
-  - `index=True`: Creates database index
-  - `default=value`: Default value if none provided
 
-## 4. Session Management
+### Key Concepts Learned:
+1. Setting up SQLAlchemy engine
+2. Creating declarative base for ORM models
+3. Defining database models with columns and constraints
+4. Understanding table and column configurations
 
-### Creating Session Factory
+## Project 2: Complete Todo API with FastAPI and SQLAlchemy
+
+### Code Implementation
 ```python
-from sqlalchemy.orm import sessionmaker
-SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
-```
-- `sessionmaker`: Creates session factory
-- `bind=engine`: Associates session with database engine
-- `expire_on_commit=False`: Keeps objects usable after commit
+from fastapi import FastAPI, status, HTTPException
+from database import Base, engine, ToDo
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-### Session Operations
-```python
-# Create session
-session = SessionLocal()
+# Create database tables
+Base.metadata.create_all(engine)
 
-try:
-    # Use session for database operations
-    pass
-finally:
-    # Always close session
+# Initialize FastAPI app
+app = FastAPI()
+
+# Pydantic model for request validation
+class ToDoRequest(BaseModel):
+    task: str
+
+# Route handlers
+@app.get("/")
+async def root():
+    return "todoo"
+
+@app.post("/todo", status_code=status.HTTP_201_CREATED)
+async def create_todo(todo: ToDoRequest):
+    session = Session(bind=engine, expire_on_commit=False)
+    tododb = ToDo(task=todo.task)
+    
+    session.add(tododb)
+    session.commit()
+    id = tododb.id
     session.close()
-```
+    
+    return f"created to_do item with id {id}"
 
-## 5. Common Session Methods
+@app.get("/todo/{id}")
+async def read_todo(id: int):
+    session = Session(bind=engine, expire_on_commit=False)
+    todo = session.query(ToDo).get(id)
+    session.close()
+    
+    if not todo:
+        raise HTTPException(status_code=404, detail=f"to_do item with id {id} not found")
+    
+    return todo
 
-### Creating Records
-```python
-# Create new todo
-new_todo = ToDo(task="Learn SQLAlchemy")
-session.add(new_todo)         # Stage for commit
-session.commit()              # Save to database
-```
+@app.get("/todo")
+async def read_todo():
+    session = Session(bind=engine, expire_on_commit=False)
+    todo_list = session.query(ToDo).all()
+    session.close()
+    return todo_list
 
-### Querying Records
-```python
-# Basic queries
-todo = session.query(ToDo).get(1)              # Get by primary key
-todos = session.query(ToDo).all()              # Get all records
-todo = session.query(ToDo).first()             # Get first record
+@app.put("/todo/{id}")
+async def update_todo(id: int, task: str):
+    session = Session(bind=engine, expire_on_commit=False)
+    todo = session.query(ToDo).get(id)
+    
+    if todo:
+        todo.task = task
+        session.commit()
+    
+    session.close()
+    
+    if not todo:
+        raise HTTPException(status_code=404, detail=f"to_do item with id {id} not found")
+    return todo
 
-# Filtered queries
-todos = session.query(ToDo).filter(ToDo.task == "Learn SQLAlchemy").all()
-todo = session.query(ToDo).filter_by(task="Learn SQLAlchemy").first()
-```
-
-### Updating Records
-```python
-todo = session.query(ToDo).get(1)
-todo.task = "Updated task"
-session.commit()
-```
-
-### Deleting Records
-```python
-todo = session.query(ToDo).get(1)
-session.delete(todo)
-session.commit()
-```
-
-## 6. Query Methods Explained
-
-### Query Building Methods
-- `query(Model)`: Starts a query for specified model
-- `filter()`: Adds WHERE clause with complex conditions
-- `filter_by()`: Adds WHERE clause with simple equality
-- `order_by()`: Sorts results
-- `limit()`: Limits number of results
-- `offset()`: Skips specified number of results
-
-### Query Execution Methods
-- `all()`: Returns list of all results
-- `first()`: Returns first result or None
-- `one()`: Returns single result (errors if 0 or >1 results)
-- `get(pk)`: Returns item by primary key
-- `count()`: Returns count of results
-
-## 7. Session States and Objects
-
-### Object States
-1. **Transient**: Object exists but isn't in session
-2. **Pending**: Object added to session but not committed
-3. **Persistent**: Object in session and committed
-4. **Detached**: Object was in session but removed
-
-### Session Management Best Practices
-```python
-def get_todo(todo_id: int):
-    session = SessionLocal()
-    try:
-        todo = session.query(ToDo).get(todo_id)
-        return todo
-    finally:
+@app.delete("/todo/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_todo(id: int):
+    session = Session(bind=engine, expire_on_commit=False)
+    todo = session.query(ToDo).get(id)
+    
+    if todo:
+        session.delete(todo)
+        session.commit()
         session.close()
+    else:
+        raise HTTPException(status_code=404, detail=f"to_do item with id {id} not found")
+    
+    return None
 ```
-- Always use try/finally or context managers
-- Close sessions after use
-- Don't share sessions across requests
-- Commit or rollback before closing
 
-## 8. Database Creation
-```python
-# Create all tables
-Base.metadata.create_all(bind=engine)
-```
-- Creates tables for all models that inherit from Base
-- Safe to run multiple times (won't recreate existing tables)
-- Must be run after defining all models
+### Key Features Implemented:
+1. **CRUD Operations**:
+   - Create: POST `/todo`
+   - Read: GET `/todo` and GET `/todo/{id}`
+   - Update: PUT `/todo/{id}`
+   - Delete: DELETE `/todo/{id}`
 
-This comprehensive guide covers the core SQLAlchemy components used in your Todo application. Would you like me to elaborate on any specific part?
+2. **Database Integration**:
+   - SQLAlchemy session management
+   - Database operations (query, add, update, delete)
+   - Proper session closing
+
+3. **Error Handling**:
+   - 404 errors for non-existent items
+   - Appropriate status codes for different operations
+
+## Technical Concepts Mastered
+
+### FastAPI
+- Route decorators (`@app.get`, `@app.post`, etc.)
+- Status codes and HTTP exceptions
+- Request/Response models with Pydantic
+- Path parameters and request body handling
+
+### SQLAlchemy
+- Engine configuration
+- Session management
+- Basic CRUD operations
+- Model definition and table creation
+
+### Best Practices Learned
+1. Always close database sessions
+2. Use appropriate HTTP status codes
+3. Implement proper error handling
+4. Validate request data using Pydantic models
+5. Structure code for maintainability
+
+## Testing
+- Tested all endpoints using FastAPI's automatic interactive docs (Swagger UI)
+- Verified CRUD operations with SQLite database
+- Confirmed proper error handling and status codes
+
+## Challenges Faced
+1. Understanding SQLAlchemy session management
+2. Implementing proper error handling
+3. Managing database connections efficiently
+
+## Next Steps
+- [ ] Implement authentication and authorization
+- [ ] Add more complex database relationships
+- [ ] Implement database migrations
+- [ ] Add input validation and sanitization
+- [ ] Implement proper logging
+
+## Resources Used
+- FastAPI official documentation
+- SQLAlchemy documentation
+- Python type hints documentation
+- SQLite documentation
+
+## Personal Notes
+SQLAlchemy initially seemed complex but became clearer after implementing the Todo API. The combination of FastAPI's modern features with SQLAlchemy's powerful ORM capabilities creates a robust foundation for building APIs. Proper session management and error handling are crucial for production-ready applications.
