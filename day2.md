@@ -1,5 +1,3 @@
-I'll create detailed notes about SQLAlchemy components and their usage in your Todo application.
-
 # SQLAlchemy Deep Dive
 
 ## 1. Engine Creation and Configuration
