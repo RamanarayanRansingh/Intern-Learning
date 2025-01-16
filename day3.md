@@ -196,3 +196,213 @@ for key, value in problem_data.items():
 - Updates only provided fields
 
 Would you like me to explain any particular aspect in more detail?
+
+# DSA Practice Tracker: Complete Guide and Concepts
+
+## 1. Project Structure
+The application is built using three main components:
+- **models.py**: Database models and configuration
+- **main.py**: FastAPI backend server
+- **streamlit_app.py**: Frontend user interface
+
+## 2. Database Concepts (models.py)
+
+### SQLAlchemy Basics
+```python
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float
+```
+- **SQLAlchemy**: An ORM (Object Relational Mapper) that converts Python classes to database tables
+- **create_engine**: Creates database connection
+- **Column**: Defines database column types
+- **Integer, String, DateTime, Float**: Different data types for columns
+
+### Database Connection
+```python
+SQLALCHEMY_DATABASE_URL = "sqlite:///./dsa_practice.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+```
+- **SQLite**: Lightweight database stored in a file
+- **check_same_thread=False**: Allows SQLite to handle multiple requests
+
+### Session Management
+```python
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+```
+- **sessionmaker**: Creates database sessions
+- **autocommit=False**: Changes must be explicitly committed
+- **autoflush=False**: Changes aren't automatically written to database
+
+### Model Definition
+```python
+class Problem(Base):
+    __tablename__ = "problems"
+    id = Column(Integer, primary_key=True, index=True)
+    # ... other columns
+```
+- **Base**: Parent class for all database models
+- **__tablename__**: Specifies table name in database
+- **primary_key**: Unique identifier for each row
+- **index=True**: Creates database index for faster queries
+
+## 3. FastAPI Backend (main.py)
+
+### Pydantic Models
+```python
+class ProblemCreate(BaseModel):
+    title: str
+    difficulty: str
+    # ... other fields
+```
+- **Pydantic**: Data validation library
+- **BaseModel**: Parent class for data validation
+- **Type hints (str, float)**: Enforce data types
+
+### Dependency Injection
+```python
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+```
+- **Dependency Injection**: Provides database session to routes
+- **yield**: Creates a generator function
+- **finally**: Ensures database connection is closed
+
+### API Routes
+```python
+@app.post("/problems/")
+def create_problem(problem: ProblemCreate, db: Session = Depends(get_db)):
+```
+- **@app.post**: HTTP POST decorator
+- **Depends(get_db)**: Injects database session
+- **response_model**: Defines response data structure
+
+### CRUD Operations
+- **CREATE**: `POST /problems/`
+- **READ**: `GET /problems/`
+- **UPDATE**: `PUT /problems/{problem_id}`
+- **DELETE**: `DELETE /problems/{problem_id}`
+
+## 4. Streamlit Frontend (streamlit_app.py)
+
+### Basic Streamlit Concepts
+```python
+st.title("🎯 DSA Practice Tracker")
+tab1, tab2, tab3 = st.tabs(["Add Practice", "View Progress", "Manage Problems"])
+```
+- **st**: Streamlit module
+- **st.title**: Page title
+- **st.tabs**: Creates tabbed interface
+
+### Form Handling
+```python
+with st.form("practice_form"):
+    title = st.text_input("Problem Title")
+```
+- **st.form**: Creates form container
+- **st.text_input**: Text input field
+- **st.form_submit_button**: Form submission button
+
+### Data Visualization
+```python
+fig1 = px.pie(df, names='difficulty')
+st.plotly_chart(fig1)
+```
+- **px**: Plotly Express for charts
+- **px.pie**: Creates pie chart
+- **st.plotly_chart**: Displays Plotly chart
+
+### State Management
+```python
+if 'editing' not in st.session_state:
+    st.session_state.editing = None
+```
+- **st.session_state**: Persists data between reruns
+- **editing**: Tracks which problem is being edited
+
+### API Integration
+```python
+response = requests.post(f"{API_URL}/problems/", json=practice_data)
+```
+- **requests**: HTTP client library
+- **response.status_code**: HTTP response status
+- **json=practice_data**: Sends JSON data
+
+## 5. Common Python Features Used
+
+### List Comprehension
+```python
+[problem for problem in problems if problem.difficulty == "Easy"]
+```
+- Creates new list based on condition
+
+### Dictionary Comprehension
+```python
+{key: value for key, value in data.items()}
+```
+- Creates dictionary with transformed data
+
+### f-strings
+```python
+f"Problem {problem.id}"
+```
+- String interpolation with variables
+
+### Type Hinting
+```python
+def get_problems() -> List[Problem]:
+```
+- Indicates expected return types
+- Helps with code documentation
+
+## 6. Best Practices Demonstrated
+
+1. **Separation of Concerns**
+   - Database models separate from API
+   - Frontend separate from backend
+   - Clear responsibility for each file
+
+2. **Error Handling**
+   - Try/except blocks
+   - HTTP error responses
+   - User feedback for actions
+
+3. **Code Organization**
+   - Logical file structure
+   - Related functionality grouped together
+   - Clear naming conventions
+
+4. **Data Validation**
+   - Pydantic models
+   - Type checking
+   - Required vs optional fields
+
+5. **User Experience**
+   - Intuitive interface
+   - Visual feedback
+   - Confirmation for deletions
+
+## 7. Common Operations
+
+### Adding a New Problem
+1. Navigate to "Add Practice" tab
+2. Fill in problem details
+3. Click "Save Practice"
+
+### Viewing Progress
+1. Go to "View Progress" tab
+2. Check metrics and charts
+3. Analyze performance
+
+### Editing a Problem
+1. Find problem in "Manage Problems"
+2. Click "Edit" button
+3. Update details
+4. Save changes
+
+### Deleting a Problem
+1. Locate problem in list
+2. Click "Delete"
+3. Confirm deletion
